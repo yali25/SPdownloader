@@ -9,38 +9,58 @@ from selenium.webdriver.chrome.options import Options
 
 from subprocess import call
 import os 
+import codecs
 
 # driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--cookies-file=./cookies.txt','--debug=yes'])
 def execute(script, args):
     driver.execute('executePhantomScript', {'script': script, 'args' : args })
 
-def wrongpdf(url):
-    with open("wrong.txt","a") as wrongf:
-       wrongf.write(url+"\n")
+def wrongpdf(furl,heading1,heading2,date) :
+    with codecs.open("wrong.txt","a","utf-8") as wrongf:
+       wrongf.write(u'{:s} {:s} {:s} {:s}\n'.format(furl,heading1,heading2,date))
 
-chrome_options = Options()  
-chrome_options.add_argument("--headless")  
-chrome_options.add_argument("--disable-gpu")  
-#chrome_options.binary_location = '/Applications/Google Chrome   Canary.app/Contents/MacOS/Google Chrome Canary'
+def badPDF(filep):
+    pdfsize = os.stat(filep).st_size / 1024
+    if pdfsize >= 210 or pdfsize <= 55:
+       print("File was not generated correctly: %s\n" % filep)
+       os.remove(filep) # remove the wrong pdf
+       return True
+    else:
+       return False
+        
 
-driver = webdriver.Chrome(executable_path=os.path.abspath("./chromedriver"), chrome_options=chrome_options)  
+#chrome_options = Options()  
+#chrome_options.add_argument("--headless")  
+#chrome_options.add_argument("--disable-gpu")  
+#driver = webdriver.Chrome(executable_path=os.path.abspath("./chromedriver"), chrome_options=chrome_options)  
 
-#driver = webdriver.PhantomJS(executable_path='./phantomjs')
+driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--load-images=no'])
+driver.implicitly_wait(60)
 #driver.command_executor._commands['executePhantomScript'] = ('POST', '/session/$sessionId/phantom/execute')
 
 #pageFormat = '''this.paperSize = {format: "A4", orientation: "portrait", margin: { top: "1cm", right: "1cm", left: "1cm", bottom: "2.5cm"} };'''
 # 1 Xpaths of the SpiegelPlus Articles
 print "1. Go to Spiegel+ to get article links"
-#starturl = "http://www.spiegel.de/spiegelplus"
-starturl = "http://www.spiegel.de/spiegelplus/archiv-2017058.html"
-#archive = "/html/body/div[4]/div[1]/div/div[2]/div[4]/div[2]/a"
-c=0
+starturl = "https://www.spiegel.de/spiegelplus"
+#starturl = "http://www.spiegel.de/spiegelplus/archiv-2017070.html"
+
+#HasArticles = True
 while True:
    print("Goto page: %s"%starturl)
    driver.get(starturl)
-   # TODO set the url for the next run
-   #try:
-   starturl      = driver.find_element_by_link_text("Mehr Artikel").get_attribute("href")
+
+   if "archiv" in starturl:
+     c=1 
+   else:
+     c=0
+
+   #nexturl      = driver.find_elements_by_id("content-main").find_element_by_link_text("Mehr Artikel").get_attribute("href")
+   try:
+      nexturl      = driver.find_element_by_link_text("Mehr Artikel").get_attribute("href")
+   except:
+      print("Reached the last page of the Archive, go back to start in the next iteration\n")  
+      nexturl = "http://www.spiegel.de/spiegelplus"
+      # HasArticles = False
    #except:
    # Try a different archive link
    #print("Try different XPATH for next page...")
@@ -54,27 +74,27 @@ while True:
       topArticle    = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/p/a')
       topH1         = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/h2/a/span[1]')
       topH2         = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/h2/a/span[2]')
-   
-      
-   # Die andereren Artikel und die Ueberschriften
-   if c==0:
       articleLinks  = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[3]/div/div/p/a')
       headings1     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[3]/div/div/h2/a/span[1]')
       headings2     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[3]/div/div/h2/a/span[2]') 
-   else:
-      articleLinks  = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/p/a')
-      headings1     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/h2/a/span[1]')                               
-      headings2     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/h2/a/span[2]') 
 
-   # Create a single list (only on the first page)
-   if c==0:              
       articleLinks = [topArticle] + articleLinks
       headings1    = [topH1] + headings1
       headings2    = [topH2] + headings2
-   
+      datetime     = ["DummyDate, DummyTime"]  + ["DummyDate, DummyTime"] * len(articleLinks)
+   else:
+      articleLinks  = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/p/a')
+      tempDate      = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/div[@class="source-date"]')
+      datetime = []
+      # Convert to string
+      for e in tempDate:
+        datetime.append(e.text)
+      headings1     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/h2/a/span[1]')                               
+      headings2     = driver.find_elements_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div/div/h2/a/span[2]') 
+
    finalUrlList = []
-   print "Create List %s %s %s " % (len(articleLinks),len(headings1),len(headings2))
-   for link,h1,h2 in zip(articleLinks,headings1,headings2):
+   print "Create List %s %s %s %s" % (len(articleLinks),len(headings1),len(headings2),len(datetime))
+   for link,h1,h2, d in zip(articleLinks,headings1,headings2,datetime):
      #print h1.text
      #print h2.text 
      url = link.get_attribute("href")
@@ -83,81 +103,88 @@ while True:
        printUrl = url  
        ggTranslateUrl = "https://translate.google.co.jp/translate?hl=ja&sl=ko&tl=en&u="+printUrl+"&anno=2"
        #print ggTranslateUrl
-       finalUrlList.append((ggTranslateUrl,h1.text,h2.text))
+       finalUrlList.append((ggTranslateUrl,h1.text,h2.text,d.split(",",1)[0]))
    
    #for e in finalUrlList:
    #  print("%s %s %s"%(e[0],e[1],e[2]))
    
    print "Found %s Spiegel+ articles" % len(articleLinks)
-   
-   c=0
-   #driver.implicitly_wait(30)
+
    dirp = "./SP"
    print "Create PDFs"
+   success = 0
    for url in finalUrlList:
-    furl = url[0]
+    furl     = url[0]
     heading1 = url[1]
     heading2 = url[2]
-    #print furl
-    #print heading1
-    #print heading2
+     
+    if c != 0:
+      date     = url[3]
+      # Check if pdf already exist
+      filename = u"{} ({}).pdf".format(heading1.replace("/","_"),heading2.replace("/","_"))
+      #print(u"Try to get: %s" % filename)
+      dirpf = dirp + "/" + date.replace(".","_")
+      filep = dirpf + "/" + filename
+      # Check if the pdf does not exist
+      if os.path.exists(filep):
+        if badPDF(filep) == True:
+           pass
+        else:
+           print("Already exist: %s" % filep)
+           success = success + 1
+           continue
+
     driver.get(furl)
-    driver.switch_to.frame(driver.find_element_by_name("c"))
-    #print "Switches to iframe"
-    link = ""
-    data = ""
+    driver.switch_to.frame(driver.find_element_by_name("c")) #print "Switches to iframe"
+
     try:
        #link = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/div[1]/ul/li[1]/span/a')
        link = driver.find_element_by_link_text("Drucken")
-       date = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[1]/div[5]/div/div[2]/time/span/span[2]/b').text                                  
+       # Date must be obtained if we are on the first page because there it is only contained inside the article         
     except:
-       wrongpdf(furl)
-       #print "Could not locate element: %s " % furl
+       print "Could not locate element DRUCKEN: %s " % furl
+       wrongpdf(furl,heading1,heading2,"No Drucken")
        #print "Will add data to the next queue"
        continue
+    try:
+       if c==0:
+          date = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[1]/div[5]/div/div[2]/time/span/span[2]/b').text    
+    except:
+       date = "NoDate"
+       print "Could not locate element DATE: %s " % furl
+       #wrongpdf(furl,heading1,heading2,"No Date")
+       #print "Will add data to the next queue"
+       #continue
+
+                   
    
     pdfLink =  link.get_attribute("href")
-    filename = u"{} ({}).pdf".format(heading1,heading2)
-    #print(u"{}".format(filename))
+    filename = u"{} ({}).pdf".format(heading1.replace("/","_"),heading2.replace("/","_"))
+    #print(u"Try to get: %s" % filename)
     dirpf = dirp + "/" + date.replace(".","_")
     filep = dirpf + "/" + filename
     # Check if the pdf does not exist
     if not os.path.exists(filep):
-      print("Not exist: %s" % filep)
+      #print("Not exist: %s" % filep)
       # Create dir
       if not os.path.exists(dirpf):
         os.makedirs(dirpf)
       call(["google-chrome","--headless","--disable-gpu",u"--print-to-pdf="+filep, pdfLink])
-      pdfsize = os.stat(filep).st_size / 1024
-      if pdfsize >= 210 or pdfsize <= 55:
-        wrongpdf(furl) 
-        os.remove(filep) # remove the wrong pdf
+
+      # Check filesize to check if the pdf was correct generated
+      if badPDF(filep) == True:
+         wrongpdf(furl,heading1,heading2,"FileSize")
+      else:
+        success = success + 1
     else:
-      print("Exist: %s" % filep)
+      print("Already exist: %s" % filep)
+      success = success + 1
       #print(u"PDF was not generated correclty: %s" % filep)
+
+   with open("download_log.txt","a") as log:
+       log.write("%s %s %s\n" %(success,len(articleLinks),starturl))
+
+   # set the next page
+   starturl = nexturl
    c = c + 1
-   #print pdfLink 
-   #driver.get(pdfLink)
-   #link.click()
-   #driver.switch_to_window(driver.window_handles[1])
-   #print furl
-   #driver.get(furl)
-   #execute(pageFormat, [])
-   #render = 'this.render("%s.pdf")' % c
-   #execute(render, [])
-   #call(["google-chrome","--headless","--disable-gpu","--print-to-pdf="+str(c)+".pdf",furl])
-   #c = c+1
-   #link = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/div[1]/ul/li[1]/span/a')
-   #driver.switch_to_frame(driver.find_element_by_xpath('//*[@id="contentframe"]/iframe'))
-   #print "Switched to iframe"
-   #driver.switch_to.default_content()
-   #print driver.page_source
-   #link = driver.find_element_by_link_text("Drucken")
-   # # set page format
-   # # inside the execution script, webpage is "this"
-   # pageFormat = '''this.paperSize = {format: "A4", orientation: "portrait", margin: { top: "1cm", right: "1cm", left: "1cm", bottom: "1cm"} };'''
-   # execute(pageFormat, [])
-   # # render current page
-   # render = '''this.render("test.pdf")'''
-   # execute(render, [])
 driver.quit()
