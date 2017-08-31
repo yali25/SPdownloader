@@ -29,19 +29,19 @@ def badPDF(filep):
        return False
         
 
-#chrome_options = Options()  
-#chrome_options.add_argument("--headless")  
-#chrome_options.add_argument("--disable-gpu")  
-#driver = webdriver.Chrome(executable_path=os.path.abspath("./chromedriver"), chrome_options=chrome_options)  
+chrome_options = Options()  
+chrome_options.add_argument("--headless")  
+chrome_options.add_argument("--disable-gpu")  
+driver = webdriver.Chrome(executable_path=os.path.abspath("./chromedriver"), chrome_options=chrome_options)  
 
-driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--load-images=no'])
-driver.implicitly_wait(60)
+#driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--load-images=no'])
+#driver.implicitly_wait(80)
 #driver.command_executor._commands['executePhantomScript'] = ('POST', '/session/$sessionId/phantom/execute')
 
 #pageFormat = '''this.paperSize = {format: "A4", orientation: "portrait", margin: { top: "1cm", right: "1cm", left: "1cm", bottom: "2.5cm"} };'''
 # 1 Xpaths of the SpiegelPlus Articles
 print "1. Go to Spiegel+ to get article links"
-starturl = "https://www.spiegel.de/spiegelplus"
+starturl = "http://www.spiegel.de/spiegelplus"
 #starturl = "http://www.spiegel.de/spiegelplus/archiv-2017070.html"
 
 #HasArticles = True
@@ -60,6 +60,7 @@ while True:
    except:
       print("Reached the last page of the Archive, go back to start in the next iteration\n")  
       nexturl = "http://www.spiegel.de/spiegelplus"
+      #break; 
       # HasArticles = False
    #except:
    # Try a different archive link
@@ -117,17 +118,31 @@ while True:
     furl     = url[0]
     heading1 = url[1]
     heading2 = url[2]
-     
+
+    filename = u"{}: ({}).pdf".format(heading1.replace("/","_").replace(":",""),heading2.replace("/","_"))
+    filepnd = dirp + "/" + "NoDate" + "/" + filename
+    noDateDir = os.path.exists(filepnd)
+
+    if  noDateDir == True:
+        if badPDF(filepnd) == True:
+           pass
+        else:
+           print("Already exist: %s" % filepnd)
+           success = success + 1
+           continue
+
     if c != 0:
       date     = url[3]
       # Check if pdf already exist
-      filename = u"{} ({}).pdf".format(heading1.replace("/","_"),heading2.replace("/","_"))
+      #filename = u"{} ({}).pdf".format(heading1.replace("/","_"),heading2.replace("/","_"))
       #print(u"Try to get: %s" % filename)
-      dirpf = dirp + "/" + date.replace(".","_")
-      filep = dirpf + "/" + filename
+      filep = dirp + "/" + date.replace(".","_") + "/" + filename
+     
+      #filep = dirpf 
       # Check if the pdf does not exist
-      if os.path.exists(filep):
-        if badPDF(filep) == True:
+      dateDir   = os.path.exists(filep)
+      if  dateDir == True:
+        if badPDF(filep):
            pass
         else:
            print("Already exist: %s" % filep)
@@ -137,38 +152,44 @@ while True:
     driver.get(furl)
     driver.switch_to.frame(driver.find_element_by_name("c")) #print "Switches to iframe"
 
+    # Check for the print link
+    NoDrucken = False
     try:
        #link = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[2]/div[2]/div[1]/ul/li[1]/span/a')
        link = driver.find_element_by_link_text("Drucken")
        # Date must be obtained if we are on the first page because there it is only contained inside the article         
     except:
-       print "Could not locate element DRUCKEN: %s " % furl
-       wrongpdf(furl,heading1,heading2,"No Drucken")
+       NoDrucken = True
        #print "Will add data to the next queue"
-       continue
+    
+    # Check for the date     
     try:
        if c==0:
           date = driver.find_element_by_xpath('/html/body/div[4]/div[1]/div/div[2]/div[1]/div[5]/div/div[2]/time/span/span[2]/b').text    
     except:
        date = "NoDate"
-       print "Could not locate element DATE: %s " % furl
-       #wrongpdf(furl,heading1,heading2,"No Date")
-       #print "Will add data to the next queue"
-       #continue
 
-                   
-   
-    pdfLink =  link.get_attribute("href")
-    filename = u"{} ({}).pdf".format(heading1.replace("/","_"),heading2.replace("/","_"))
-    #print(u"Try to get: %s" % filename)
+    # Construct the path    
     dirpf = dirp + "/" + date.replace(".","_")
     filep = dirpf + "/" + filename
+   
+    # Check if the pdf already exist
+    if os.path.exists(filep):
+      print("In here Already exist: %s" % filep)
+      success = success + 1
+      continue
+
+
+
+  
     # Check if the pdf does not exist
-    if not os.path.exists(filep):
+    if NoDrucken == False and not os.path.exists(filep):
       #print("Not exist: %s" % filep)
       # Create dir
       if not os.path.exists(dirpf):
         os.makedirs(dirpf)
+
+      pdfLink =  link.get_attribute("href")
       call(["google-chrome","--headless","--disable-gpu",u"--print-to-pdf="+filep, pdfLink])
 
       # Check filesize to check if the pdf was correct generated
@@ -176,13 +197,19 @@ while True:
          wrongpdf(furl,heading1,heading2,"FileSize")
       else:
         success = success + 1
-    else:
-      print("Already exist: %s" % filep)
-      success = success + 1
-      #print(u"PDF was not generated correclty: %s" % filep)
 
+    elif os.path.exists(filep):
+      print("Never here Already exist: %s" % filep)
+      success = success + 1
+    elif NoDrucken == True and not os.path.exists(filep):
+      print "Could not locate element DRUCKEN: %s %s " % (date, furl)
+      wrongpdf(furl,heading1,heading2,"NoDrucken")
+
+   logstr = "%s %s %s\n"
    with open("download_log.txt","a") as log:
-       log.write("%s %s %s\n" %(success,len(articleLinks),starturl))
+       if success != len(finalUrlList):
+          logstr = "------->"+logstr
+       log.write(logstr %(success,len(finalUrlList),starturl))
 
    # set the next page
    starturl = nexturl
