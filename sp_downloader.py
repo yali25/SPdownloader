@@ -11,10 +11,6 @@ from subprocess import call
 import os 
 import codecs
 
-# driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--cookies-file=./cookies.txt','--debug=yes'])
-def execute(script, args):
-    driver.execute('executePhantomScript', {'script': script, 'args' : args })
-
 def wrongpdf(furl,heading1,heading2,date) :
     with codecs.open("wrong.txt","a","utf-8") as wrongf:
        wrongf.write(u'{:s} {:s} {:s} {:s}\n'.format(furl,heading1,heading2,date))
