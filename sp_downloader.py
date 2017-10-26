@@ -11,6 +11,10 @@ from subprocess import call
 import os 
 import codecs
 
+# pdftext for converting the pdf to text 
+# decrypt text with python
+# generate pdf with chrome 
+
 def wrongpdf(furl,heading1,heading2,date) :
     with codecs.open("wrong.txt","a","utf-8") as wrongf:
        wrongf.write(u'{:s} {:s} {:s} {:s}\n'.format(furl,heading1,heading2,date))
@@ -28,6 +32,7 @@ def badPDF(filep):
 chrome_options = Options()  
 chrome_options.add_argument("--headless")  
 chrome_options.add_argument("--disable-gpu")  
+#remote-debugging-port=9222'
 driver = webdriver.Chrome(executable_path=os.path.abspath("./chromedriver"), chrome_options=chrome_options)  
 
 #driver = webdriver.PhantomJS(executable_path='./phantomjs',service_args=['--load-images=no'])
